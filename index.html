@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Fishbowl Game Launcher</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font family -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+        }
+        /* Custom card style to lift the word display */
+        #card {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            min-height: 150px;
+        }
+        /* Custom styling for the scrollable modal content */
+        .modal-content-area {
+            max-height: 85vh; /* Maximum height before scrolling */
+            overflow-y: auto; /* Enable vertical scrolling */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="gameContainer" class="w-full max-w-xl bg-white shadow-2xl rounded-xl p-6 md:p-10 text-center transition-all duration-300">
+        <div class="flex justify-between items-center mb-4">
+             <h1 class="text-3xl md:text-4xl font-black text-blue-800">
+                The Fishbowl
+            </h1>
+            <button id="openHowToButton" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-semibold py-1 px-3 rounded-full transition duration-150">
+                How to Play
+            </button>
+        </div>
+        
+        <p id="statusMessage" class="text-lg text-gray-600 mb-8">
+            Follow the steps below to gather messages and start playing!
+        </p>
+
+        <!-- Step 1: Form Creation -->
+        <div class="mb-8 p-6 bg-blue-50 border-l-4 border-blue-500 rounded-lg text-left">
+            <h2 class="text-xl font-bold text-blue-800 mb-3">1. Create Your Google Form & Collect Messages</h2>
+            <p class="text-gray-700 mb-3 text-sm">
+                Click the button below to quickly create a new form. Use a **Paragraph (long answer text)** question to collect the phrases.
+            </p>
+            <a href="https://docs.google.com/forms/u/0/create?usp=forms_home&edit_requested=true" target="_blank" class="inline-block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150">
+                Go to Google Forms
+            </a>
+            <p class="text-xs text-gray-500 mt-3 italic">
+                After collecting responses, open the linked Google Sheet, go to **File > Download > CSV** to get your file.
+            </p>
+        </div>
+
+        <!-- Step 2: CSV Upload -->
+        <div id="uploadSection" class="mb-10 p-6 bg-green-50 border-l-4 border-green-500 rounded-lg">
+            <h2 class="text-xl font-bold text-green-800 mb-3 text-left">2. Upload Your CSV File to Play</h2>
+            <div class="flex flex-col md:flex-row gap-2">
+                <input type="file" id="csvFileInput" accept=".csv" class="flex-grow w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-white focus:outline-none p-2 mb-3 md:mb-0">
+                <button id="loadButton" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out transform hover:scale-[1.01]">
+                    Load Messages
+                </button>
+            </div>
+        </div>
+
+        <!-- Display Card for the Word/Phrase -->
+        <div id="card" class="bg-gradient-to-br from-indigo-600 to-purple-700 text-white rounded-2xl p-8 shadow-xl flex items-center justify-center mb-10 min-h-[150px] transform transition duration-500">
+            <p id="currentMessage" class="text-3xl md:text-4xl font-black italic select-none">
+                Awaiting Data
+            </p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div id="actionButtons" class="flex flex-col space-y-4">
+            <button id="nextButton" disabled class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition duration-150 ease-in-out transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                Read Next Message
+            </button>
+            <button id="resetButton" disabled class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-150 ease-in-out transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                Reset Game
+            </button>
+        </div>
+
+        <p id="progress" class="mt-6 text-sm text-gray-500 font-semibold">
+            0 / 0 Messages
+        </p>
+
+        <!-- Custom Alert/Modal for error messages -->
+        <div id="errorModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-xl p-6 shadow-2xl w-full max-w-sm">
+                <h3 class="text-xl font-bold text-red-600 mb-4">Error</h3>
+                <p id="errorText" class="text-gray-700 mb-6"></p>
+                <button onclick="document.getElementById('errorModal').classList.add('hidden')" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-lg">Close</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- How To Play Modal -->
+    <div id="howToModal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl transform transition-all duration-300">
+            <div class="p-6 md:p-8 flex flex-col h-full">
+                <!-- Header -->
+                <div class="flex justify-between items-center pb-4 border-b border-gray-200">
+                    <h2 class="text-3xl font-black text-blue-800">How to Play The Fishbowl</h2>
+                    <button id="closeHowToButton" class="text-gray-500 hover:text-gray-900 transition duration-150">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                
+                <!-- Scrollable Content -->
+                <div class="modal-content-area py-6 text-left space-y-6">
+                    
+                    <h3 class="text-xl font-bold text-indigo-600">Phase 1: Setup & Data Collection</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-gray-700 pl-4">
+                        <li>
+                            **Create the Form:** Click the **"Go to Google Forms"** button on the main screen. Set up a simple form with one question using the **Paragraph (Long Answer)** format for players to write their messages.
+                        </li>
+                        <li>
+                            **Share & Collect:** Share the form link with all players to collect their submissions (e.g., inside jokes, personal compliments, confessions, etc.).
+                        </li>
+                        <li>
+                            **Download CSV:** Once all submissions are in, the admin goes to the **Responses** tab in Google Forms, clicks the Sheets icon, and then in the Google Sheet, selects **File > Download > Comma Separated Values (.csv)**.
+                        </li>
+                        <li>
+                            **Load Game:** Use the **"Upload Your CSV File"** section in this app to select and load the CSV file. The app will shuffle the messages and confirm when the game is ready.
+                        </li>
+                    </ol>
+
+                    <h3 class="text-xl font-bold text-indigo-600">Phase 2: Playing the Game (The Admin's Role)</h3>
+                    <p class="text-gray-700">
+                        The core gameplay is driven by the **Admin** (the person controlling this screen) who reads the messages to the group.
+                    </p>
+                    <ol class="list-decimal list-inside space-y-2 text-gray-700 pl-4">
+                        <li>
+                            **Start Reading:** The admin clicks the **"Read Next Message"** button to display the first message from the virtual "fishbowl."
+                        </li>
+                        <li>
+                            **The Reveal:** The admin reads the message aloud to the group.
+                        </li>
+                        <li>
+                            **The Guess/Reaction:** After the message is read, the **person for whom the message was written** gets a chance to guess who wrote it, or simply react to the statement.
+                        </li>
+                        <li>
+                            **Next Message:** Once the discussion for the current message is complete, the admin clicks **"Read Next Message"** again to continue the game.
+                        </li>
+                        <li>
+                            **End of Game:** The game continues until all messages have been read (the progress indicator shows $X/X$). Click **Reset Game** to shuffle and read the messages again if desired!
+                        </li>
+                    </ol>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === State Variables ===
+        let allMessages = [];
+        let shuffledMessages = [];
+        let currentIndex = 0;
+        let isGameReady = false;
+
+        // === DOM Elements ===
+        const currentMessageEl = document.getElementById('currentMessage');
+        const nextButton = document.getElementById('nextButton');
+        const resetButton = document.getElementById('resetButton');
+        const statusMessageEl = document.getElementById('statusMessage');
+        const progressEl = document.getElementById('progress');
+        const csvFileInput = document.getElementById('csvFileInput');
+        const loadButton = document.getElementById('loadButton');
+        const errorModal = document.getElementById('errorModal');
+        const errorText = document.getElementById('errorText');
+        const howToModal = document.getElementById('howToModal');
+        const openHowToButton = document.getElementById('openHowToButton');
+        const closeHowToButton = document.getElementById('closeHowToButton');
+
+        /**
+         * Utility function to show a custom error modal instead of alert().
+         * @param {string} message - The error message to display.
+         */
+        function showCustomError(message) {
+            errorText.textContent = message;
+            errorModal.classList.remove('hidden');
+        }
+        
+        /**
+         * Shuffles an array using the Fisher-Yates (Knuth) algorithm.
+         * @param {Array<any>} array - The array to shuffle.
+         * @returns {Array<any>} The shuffled array.
+         */
+        function shuffleArray(array) {
+            let shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        /**
+         * Parses the CSV text content into an array of messages.
+         * Assumes messages are in the second column (index 1) after the timestamp (index 0).
+         * @param {string} csvText - The raw CSV content.
+         */
+        function parseCSV(csvText) {
+            // Split by newline. Ignore the header (first line).
+            const lines = csvText.trim().split('\n').slice(1); 
+            
+            allMessages = lines
+                .map(line => {
+                    // Regex split that handles commas inside quotes (for robustness)
+                    const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); 
+                    
+                    // We target index 1 (the second column, usually the user's message)
+                    const message = parts[1]; 
+                    
+                    // Clean up the message: remove potential surrounding quotes and trim whitespace
+                    return message ? message.replace(/^"|"$/g, '').trim() : null;
+                })
+                .filter(message => message && message.length > 1); // Filter out empty or too-short messages
+
+            if (allMessages.length === 0) {
+                statusMessageEl.textContent = "Error: No valid messages found in the CSV file. Please check that you collected responses and downloaded the correct file.";
+                currentMessageEl.textContent = "NO MESSAGES";
+                nextButton.disabled = true;
+                resetButton.disabled = true;
+                isGameReady = false;
+            } else {
+                isGameReady = true;
+                resetGame();
+                statusMessageEl.textContent = `Success! ${allMessages.length} messages loaded. Click 'Start Reading' to begin!`;
+            }
+        }
+
+        /**
+         * Handles the file selection and loads the content using FileReader.
+         */
+        function handleFileSelect() {
+            const file = csvFileInput.files[0];
+            if (!file) {
+                showCustomError("Please select a CSV file to load.");
+                return;
+            }
+
+            // Show loading state
+            loadButton.textContent = "Processing...";
+            loadButton.disabled = true;
+            statusMessageEl.textContent = "Reading file content...";
+
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    parseCSV(e.target.result);
+                } catch (error) {
+                    const errorMessage = `Failed to parse file: ${error.message}. Ensure it is the CSV downloaded directly from the Google Sheet.`;
+                    showCustomError(errorMessage);
+                    statusMessageEl.textContent = "File loading failed.";
+                    currentMessageEl.textContent = "LOADING ERROR";
+                } finally {
+                    loadButton.textContent = "Load Messages";
+                    loadButton.disabled = false;
+                }
+            };
+            
+            reader.onerror = () => {
+                const errorMessage = "Error reading the file. Ensure it is a valid CSV file.";
+                showCustomError(errorMessage);
+                statusMessageEl.textContent = "File reading failed.";
+                loadButton.textContent = "Load Messages";
+                loadButton.disabled = false;
+            };
+
+            reader.readAsText(file);
+        }
+
+        /**
+         * Resets the game by shuffling the messages and setting the index to 0.
+         */
+        function resetGame() {
+            if (!isGameReady) return;
+            shuffledMessages = shuffleArray(allMessages);
+            currentIndex = 0;
+            currentMessageEl.classList.remove('opacity-0');
+            statusMessageEl.textContent = `Game ready! Total messages: ${allMessages.length}. Click 'Start Reading' to begin!`;
+            currentMessageEl.textContent = "Click 'Start Reading' to begin!";
+            nextButton.textContent = "Start Reading";
+            nextButton.disabled = false;
+            resetButton.disabled = true;
+            updateProgress();
+        }
+
+        /**
+         * Displays the next message in the shuffled list.
+         */
+        function displayNextWord() {
+            if (!isGameReady) return;
+            
+            resetButton.disabled = false;
+            nextButton.textContent = "Read Next Message";
+
+            if (currentIndex < shuffledMessages.length) {
+                // Display the current message
+                currentMessageEl.textContent = shuffledMessages[currentIndex];
+                currentIndex++; // Increment index for the next call
+                updateProgress();
+            } else {
+                // Game Over
+                currentMessageEl.textContent = "Fishbowl EMPTY! Game Over!";
+                nextButton.textContent = "Game Finished";
+                nextButton.disabled = true;
+                resetButton.disabled = false;
+                statusMessageEl.textContent = "All messages have been used. Click Reset to read them again!";
+            }
+        }
+
+        /**
+         * Updates the progress indicator on the screen.
+         */
+        function updateProgress() {
+            const played = Math.min(currentIndex, allMessages.length);
+            const total = allMessages.length;
+            progressEl.textContent = `${played} / ${total} Messages available`;
+        }
+        
+        /**
+         * Toggles the visibility of the How To Play modal.
+         */
+        function toggleHowToModal(show) {
+            if (show) {
+                howToModal.classList.remove('hidden');
+            } else {
+                howToModal.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Initializes event listeners.
+         */
+        function init() {
+            // File Handling
+            loadButton.addEventListener('click', handleFileSelect);
+            
+            // Game Flow
+            nextButton.addEventListener('click', displayNextWord);
+            resetButton.addEventListener('click', resetGame);
+            
+            // Modal Handling
+            openHowToButton.addEventListener('click', () => toggleHowToModal(true));
+            closeHowToButton.addEventListener('click', () => toggleHowToModal(false));
+            
+            // Initial state update
+            updateProgress();
+        }
+
+        // Start the application once the DOM is fully loaded
+        window.onload = init;
+
+    </script>
+</body>
+</html>
